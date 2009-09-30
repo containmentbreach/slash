@@ -9,7 +9,7 @@ module UnREST
       end
 
       def encode(data)
-        data.to_hash.to_json
+        ::JSON.generate(data)
       end
 
       def decode(data)
