@@ -3,7 +3,6 @@ require 'date'
 require 'time'
 require 'uri'
 require 'benchmark'
-require 'logger'
 require 'unrest/exceptions'
 
 module UnREST
@@ -13,12 +12,6 @@ module UnREST
   class Connection
 
     attr_reader :site, :user, :password, :timeout, :proxy, :ssl_options
-
-    class << self
-      def requests
-        @@requests ||= []
-      end
-    end
 
     # The +site+ parameter is required and will set the +site+
     # attribute to the URI for the remote resource service.
@@ -30,7 +23,10 @@ module UnREST
     # Set URI for remote service.
     def site=(site)
       @http = nil
+
       @site = site.is_a?(URI) ? site : URI.parse(site)
+      (@site = @site.dup).path = '' unless @site.path.empty?
+
       @user = URI.decode(@site.user) if @site.user
       @password = URI.decode(@site.password) if @site.password
     end
@@ -66,19 +62,19 @@ module UnREST
     # Execute a GET request.
     # Used to get (find) resources.
     def get(path = nil, params = {}, headers = {})
-      mkrq(Net::HTTP::Get, path, params, headers)
+      request(Net::HTTP::Get, path, params, headers)
     end
 
     # Execute a DELETE request (see HTTP protocol documentation if unfamiliar).
     # Used to delete resources.
     def delete(path, params = {}, headers = {})
-      mkrq(Net::HTTP::Delete, path, params, headers)
+      request(Net::HTTP::Delete, path, params, headers)
     end
 
     # Execute a PUT request (see HTTP protocol documentation if unfamiliar).
     # Used to update resources.
     def put(path, params = {}, body = '', headers = {})
-      mkrq(Net::HTTP::Put, path, body ? params : {}, headers) do |rq|
+      request(Net::HTTP::Put, path, body ? params : {}, headers) do |rq|
         if body
           rq.body = body
         else
@@ -90,7 +86,7 @@ module UnREST
     # Execute a POST request.
     # Used to create new resources.
     def post(path, params = {}, body = nil, headers = {})
-      mkrq(Net::HTTP::Post, path, body ? params : {}, headers) do |rq|
+      request(Net::HTTP::Post, path, body ? params : {}, headers) do |rq|
         if body
           rq.body = body
         else
@@ -102,29 +98,29 @@ module UnREST
     # Execute a HEAD request.
     # Used to obtain meta-information about resources, such as whether they exist and their size (via response headers).
     def head(path, params = {}, headers = {})
-      mkrq(Net::HTTP::Head, path, params, headers)
+      request(Net::HTTP::Head, path, params, headers)
     end
 
 
     private
-    def mkrq(rqtype, path, params, headers)
+    def request(rqtype, path, params, headers)
       query = params_to_query(params)
       rq = rqtype.new(query.empty? ? path : "#{path}?#{query}", build_request_headers(headers))
       yield rq if block_given?
-      request(rq)
+      http_request(rq)
     end
 
     def params_to_query(params)
-      if params.respond_to?(:to_query)
-        params.to_query
-      else
-        require 'cgi' unless defined?(CGI) && defined?(CGI::escape)
-        params.map {|k, v| "#{CGI.escape(k.to_s)}=#{CGI.escape(v.to_s)}" } * '&'
-      end
+      require 'cgi' unless defined?(CGI) && defined?(CGI::escape)
+      params.map do |k, v|
+        q = CGI.escape(k.to_s)
+        q << '=' << CGI.escape(v.to_s) if v
+        q
+      end * '&'
     end
 
     # Makes request to remote service.
-    def request(rq)
+    def http_request(rq)
       logger.info "#{rq.method.to_s.upcase} #{site.merge(rq.path)}" if logger
       result = nil
       ms = 1000 * Benchmark.realtime { result = http.request(rq) }
@@ -229,7 +225,7 @@ module UnREST
     end
 
     def logger #:nodoc:
-      @logger ||= Logger.new(STDERR)
+      UnREST.logger
     end
   end
 end

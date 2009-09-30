@@ -1,9 +1,12 @@
+require 'forwardable'
 require 'stringio'
 require 'unrest/connection'
 require 'unrest/formats'
 
 module UnREST
   class Resource
+    extend Forwardable
+
     def self.new!(*args, &block)
       r = allocate
       r.send(:initialize!, *args, &block)
@@ -12,10 +15,9 @@ module UnREST
 
     attr_accessor :connection, :format, :path, :params, :headers
 
-    def initialize(site, format = nil, params = {}, headers = {})
-      site = site.is_a?(URI) ? site.dup : URI.parse(site)
-      path, site.path = site.path, ''
-      initialize!(Connection.new(site), format, path, params, headers)
+    def initialize(site, format = Formats.json, params = {}, headers = {})
+      site = site.is_a?(URI) ? site : URI.parse(site)
+      initialize!(Connection.new(site), format, site.path, params, headers)
     end
 
     def initialize!(connection, format, path = nil, params = {}, headers = {})
@@ -23,9 +25,8 @@ module UnREST
     end
     private :initialize!
 
-    def site
-      connection.site
-    end
+    def_delegators :connection, :site, :user, :password, :timeout, :proxy, :ssl_options,
+      :site, :user, :password, :timeout, :proxy, :ssl_options
 
     def [](path, params = {}, headers = {})
       self.class.new!(connection, format, *merge(path.to_s, params, headers))
