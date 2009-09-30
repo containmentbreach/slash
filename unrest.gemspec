@@ -26,7 +26,7 @@ gemspec = Gem::Specification.new do |s|
   )
 
   s.test_files = %w(
-    spec/unrest_spec.rb
+    spec/resource_spec.rb
   )
 
   s.has_rdoc = true
