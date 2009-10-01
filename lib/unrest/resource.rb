@@ -58,7 +58,7 @@ module UnREST
 
     private
     def request(params, headers, data = nil)
-      merge('', params, headers) do |path, params, headers|
+      merge(nil, params, headers) do |path, params, headers|
         format.prepare_request(path, params, headers, data) do |path, params, headers, data|
           handle_response(yield path, params, headers, data)
         end
@@ -66,7 +66,12 @@ module UnREST
     end
 
     def merge(path, params, headers)
-      path, params, headers = site.merge(self.path).merge(path).path, self.params.merge(params), self.headers.merge(headers)
+      path = if path && !path.empty?
+        site.merge(self.path =~ /\/\z/ ? self.path : self.path + '/').merge(path).path
+      else
+        self.path
+      end
+      params, headers = self.params.merge(params), self.headers.merge(headers)
       if block_given?
         return yield(path, params, headers)
       else
