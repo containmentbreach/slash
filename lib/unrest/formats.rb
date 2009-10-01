@@ -28,7 +28,7 @@ module UnREST
       end
 
       def interpret_response(headers, body)
-        codec.decode(body)
+        body && codec.decode(body)
       end
     end
 

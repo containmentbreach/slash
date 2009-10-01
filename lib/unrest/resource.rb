@@ -67,11 +67,16 @@ module UnREST
 
     def merge(path, params, headers)
       path, params, headers = site.merge(self.path).merge(path).path, self.params.merge(params), self.headers.merge(headers)
-      return block_given? ? yield(path, params, headers) : path, params, headers
+      if block_given?
+        return yield(path, params, headers)
+      else
+        return path, params, headers
+      end
     end
 
     def handle_response(response)
-      format.interpret_response(response.to_hash, StringIO.new(response.body))
+      body = response.body
+      format.interpret_response(response.to_hash, body && StringIO.new(body))
     end
   end
 end
