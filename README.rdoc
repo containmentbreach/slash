@@ -1,3 +1,11 @@
 == unrest
+    @resource = UnREST::Resource.new('http://api.something.com',
+      UnREST::Formats.xml(:codec => UnREST::Formats::PeanutsXML.new(Response)),
+      rewrite_options(options).update(:key => API_KEY))
 
-You should document your project here.
+    cats = @resource['cats']
+    cats.get
+    cats.create(:name => 'Tom')
+    cats[123].update(:name => 'Tim')
+    cats[123].destroy
+

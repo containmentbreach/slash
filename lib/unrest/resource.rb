@@ -60,7 +60,7 @@ module UnREST
     def request(params, headers, data = nil)
       merge(nil, params, headers) do |path, params, headers|
         format.prepare_request(path, params, headers, data) do |path, params, headers, data|
-          handle_response(yield path, params, headers, data)
+          handle_response(yield(path, params, headers, data))
         end
       end
     end
