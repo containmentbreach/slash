@@ -27,8 +27,9 @@ module UnREST
         yield path, params, headers, data
       end
 
-      def interpret_response(headers, body)
-        body && codec.decode(body)
+      def interpret_response(response)
+        bs = response.body_stream
+        bs && codec.decode(bs)
       end
     end
 

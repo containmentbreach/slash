@@ -1,50 +1,29 @@
 require 'net/https'
 require 'date'
 require 'time'
-require 'uri'
 require 'benchmark'
-require 'unrest/exceptions'
+require 'stringio'
+require 'unrest/base'
+
 
 module UnREST
   # Class to handle connections to remote web services.
   # This class is used by ActiveResource::Base to interface with REST
   # services.
-  class Connection
+  class NetHttpConnection < BaseConnection
 
-    attr_reader :site, :user, :password, :timeout, :proxy, :ssl_options
-
-    # The +site+ parameter is required and will set the +site+
-    # attribute to the URI for the remote resource service.
-    def initialize(site)
-      raise ArgumentError, 'Missing site URI' unless site
-      self.site = site
-    end
+    attr_reader :proxy, :ssl_options
 
     # Set URI for remote service.
     def site=(site)
       @http = nil
-
-      @site = site.is_a?(URI) ? site : URI.parse(site)
-      (@site = @site.dup).path = '' unless @site.path.empty?
-
-      @user = URI.decode(@site.user) if @site.user
-      @password = URI.decode(@site.password) if @site.password
+      super
     end
 
     # Set the proxy for remote service.
     def proxy=(proxy)
       @http = nil
       @proxy = proxy.is_a?(URI) ? proxy : URI.parse(proxy)
-    end
-
-    # Set the user for remote service.
-    def user=(user)
-      @user = user
-    end
-
-    # Set password for remote service.
-    def password=(password)
-      @password = password
     end
 
     # Set the number of seconds after which HTTP requests to the remote service should time out.
@@ -61,20 +40,20 @@ module UnREST
 
     # Execute a GET request.
     # Used to get (find) resources.
-    def get(path = nil, params = {}, headers = {})
-      request(Net::HTTP::Get, path, params, headers)
+    def get(path = nil, params = {}, headers = {}, &block)
+      request(block, Net::HTTP::Get, path, params, headers)
     end
 
     # Execute a DELETE request (see HTTP protocol documentation if unfamiliar).
     # Used to delete resources.
-    def delete(path, params = {}, headers = {})
-      request(Net::HTTP::Delete, path, params, headers)
+    def delete(path, params = {}, headers = {}, &block)
+      request(block, Net::HTTP::Delete, path, params, headers)
     end
 
     # Execute a PUT request (see HTTP protocol documentation if unfamiliar).
     # Used to update resources.
-    def put(path, params = {}, body = '', headers = {})
-      request(Net::HTTP::Put, path, body ? params : {}, headers) do |rq|
+    def put(path, params = {}, body = '', headers = {}, &block)
+      request(block, Net::HTTP::Put, path, body ? params : {}, headers) do |rq|
         if body
           rq.body = body
         else
@@ -85,8 +64,8 @@ module UnREST
 
     # Execute a POST request.
     # Used to create new resources.
-    def post(path, params = {}, body = nil, headers = {})
-      request(Net::HTTP::Post, path, body ? params : {}, headers) do |rq|
+    def post(path, params = {}, body = nil, headers = {}, &block)
+      request(block, Net::HTTP::Post, path, body ? params : {}, headers) do |rq|
         if body
           rq.body = body
         else
@@ -97,17 +76,23 @@ module UnREST
 
     # Execute a HEAD request.
     # Used to obtain meta-information about resources, such as whether they exist and their size (via response headers).
-    def head(path, params = {}, headers = {})
-      request(Net::HTTP::Head, path, params, headers)
+    def head(path, params = {}, headers = {}, &block)
+      request(block, Net::HTTP::Head, path, params, headers)
     end
 
 
     private
-    def request(rqtype, path, params, headers)
+    def request(handler, rqtype, path, params, headers)
       query = params_to_query(params)
       rq = rqtype.new(query.empty? ? path : "#{path}?#{query}", build_request_headers(headers))
       yield rq if block_given?
-      http_request(rq)
+      resp = http_request(rq)
+      if handler
+        handler.call(resp)
+        resp
+      else
+        check_and_raise(resp)
+      end
     end
 
     def params_to_query(params)
@@ -126,43 +111,22 @@ module UnREST
       ms = 1000 * Benchmark.realtime { result = http.request(rq) }
       result = http.request(rq)
       logger.info "--> %d %s (%d %.0fms)" % [result.code, result.message, result.body ? result.body.length : 0, ms] if logger
-      handle_response(result)
+      handle_response(augment_response(result))
     rescue Timeout::Error => e
       raise TimeoutError.new(e.message)
     rescue OpenSSL::SSL::SSLError => e
       raise SSLError.new(e.message)
     end
 
-    # Handles response and error codes from remote service.
-    def handle_response(response)
-      case response.code.to_i
-      when 301,302
-        raise(Redirection.new(response))
-      when 200...400
-        response
-      when 400
-        raise(BadRequest.new(response))
-      when 401
-        raise(UnauthorizedAccess.new(response))
-      when 403
-        raise(ForbiddenAccess.new(response))
-      when 404
-        raise(ResourceNotFound.new(response))
-      when 405
-        raise(MethodNotAllowed.new(response))
-      when 409
-        raise(ResourceConflict.new(response))
-      when 410
-        raise(ResourceGone.new(response))
-      when 422
-        raise(ResourceInvalid.new(response))
-      when 401...500
-        raise(ClientError.new(response))
-      when 500...600
-        raise(ServerError.new(response))
-      else
-        raise(ConnectionError.new(response, "Unknown response code: #{response.code}"))
+    def augment_response(response)
+      class << response
+        attr_accessor :exception
+        alias headers to_hash
+        def body_stream
+          body && StringIO.new(body)
+        end
       end
+      response
     end
 
     # Creates new Net::HTTP instance for communication with
@@ -212,20 +176,6 @@ module UnREST
       http.verify_depth    = @ssl_options[:verify_depth]    if @ssl_options[:verify_depth]
 
       http
-    end
-
-    # Builds headers for request to remote service.
-    def build_request_headers(headers)
-      authorization_header.update(headers)
-    end
-
-    # Sets authorization header
-    def authorization_header
-      (@user || @password ? { 'Authorization' => 'Basic ' + ["#{@user}:#{ @password}"].pack('m').delete("\r\n") } : {})
-    end
-
-    def logger #:nodoc:
-      UnREST.logger
     end
   end
 end

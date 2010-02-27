@@ -1,7 +1,7 @@
 gemspec = Gem::Specification.new do |s|
   s.name = 'unrest'
-  s.version = '0.1'
-  s.date = '2009-10-01'
+  s.version = '0.2'
+  s.date = '2010-02-27'
   s.authors = ['Igor Gunko']
   s.email = 'tekmon@gmail.com'
   s.summary = 'REST-client'
@@ -18,7 +18,9 @@ gemspec = Gem::Specification.new do |s|
     lib/unrest.rb
     lib/omg-unrest.rb
     lib/unrest/exceptions.rb
-    lib/unrest/connection.rb
+    lib/unrest/base.rb
+    lib/unrest/nethttp.rb
+    lib/unrest/typhoeus.rb
     lib/unrest/resource.rb
     lib/unrest/formats.rb
     lib/unrest/json.rb
