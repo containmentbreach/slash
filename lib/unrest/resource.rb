@@ -5,14 +5,24 @@ require 'unrest/formats'
 
 module UnREST
   class Resource
-    class Result
-      def initialize(r)
-        @r = r
+    class Response
+      extend Forwardable
+
+      def initialize(result, response, exception)
+        @result, @response, @exception = result, response, exception
       end
 
-      def get
-        raise @r if @r.is_a?(Exception)
-        @r
+      attr_reader :response, :exception
+
+      def_delegators :response, :code, :headers
+
+      def result
+        raise exception if exception
+        @result
+      end
+
+      def error?
+        !exception.nil?
       end
     end
 
@@ -34,7 +44,7 @@ module UnREST
       @connection, @format, @path, @params, @headers = connection, format, path || '', params, headers
     end
 
-    def_delegators :connection, :site, :user, :password, :timeout, :proxy,
+    def_delegators :connection, :run, :site, :user, :password, :timeout, :proxy,
       :site=, :user=, :password=, :timeout=, :proxy=
 
     def [](path, params = {}, headers = {})
@@ -69,19 +79,14 @@ module UnREST
     def request(handler, params, headers, data = nil)
       merge(nil, params, headers) do |path, params, headers|
         format.prepare_request(path, params, headers, data) do |path, params, headers, data|
-          h = proc do |response|
-            result = begin
-              handle_response(response)
-            rescue Exception => e
-              e
-            end
+          h = handler && proc do |response|
             begin
-              handler.call(Result.new(result))
-            rescue
-              # swallow
+              handler.call(handle_response(response))
+            rescue => e
+              logger.error "error in callback: #{e}"
             end
           end
-          resp = yield(path, params, headers, data, handler && h)
+          resp = yield(path, params, headers, data, h)
           handler ? nil : handle_response(resp)
         end
       end
@@ -102,8 +107,12 @@ module UnREST
     end
 
     def handle_response(response)
-      raise response.exception if response.exception
-      format.interpret_response(response)
+      begin
+        exception = response.exception
+        result = format.interpret_response(response)
+      rescue => exception
+      end
+      Response.new(result, response, exception)
     end
   end
 end

@@ -80,7 +80,6 @@ module UnREST
       request(block, Net::HTTP::Head, path, params, headers)
     end
 
-
     private
     def request(handler, rqtype, path, params, headers)
       query = params_to_query(params)
@@ -106,12 +105,12 @@ module UnREST
 
     # Makes request to remote service.
     def http_request(rq)
-      logger.info "#{rq.method.to_s.upcase} #{site.merge(rq.path)}" if logger
+      logger.debug "#{rq.method.to_s.upcase} #{site.merge(rq.path)}" if logger
       result = nil
       ms = 1000 * Benchmark.realtime { result = http.request(rq) }
       result = http.request(rq)
-      logger.info "--> %d %s (%d %.0fms)" % [result.code, result.message, result.body ? result.body.length : 0, ms] if logger
-      handle_response(augment_response(result))
+      logger.debug "--> %d %s (%d %.0fms)" % [result.code, result.message, result.body ? result.body.length : 0, ms] if logger
+      augment_response(result)
     rescue Timeout::Error => e
       raise TimeoutError.new(e.message)
     rescue OpenSSL::SSL::SSLError => e
@@ -126,7 +125,7 @@ module UnREST
           body && StringIO.new(body)
         end
       end
-      response
+      handle_response(response)
     end
 
     # Creates new Net::HTTP instance for communication with

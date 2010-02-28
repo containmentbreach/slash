@@ -5,15 +5,17 @@ require 'unrest/base'
 
 module UnREST
   class TyphoeusConnection < BaseConnection
-    def initialize(site, hydra = nil)
+    def initialize(site, hydra_or_options = nil)
       super(site)
-      @hydra = case hydra
+      case hydra_or_options
       when nil
-        Typhoeus::Hydra.new
+        @hydra = Typhoeus::Hydra.new
+        @hydra.disable_memoization
       when Hash
-        Typhoeus::Hydra.new(hydra)
+        @hydra = Typhoeus::Hydra.new(hydra_or_options)
+        @hydra.disable_memoization
       else
-        hydra
+        @hydra = hydra_or_options
       end
     end
 
@@ -58,8 +60,6 @@ module UnREST
       uri = site
       uri = uri.merge(path) if path
 
-      logger.info "#{method.to_s.upcase} #{uri}" if logger
-
       rq = Typhoeus::Request.new(uri.to_s,
         :method => method,
         :headers => build_request_headers(headers),
@@ -68,8 +68,16 @@ module UnREST
         :timeout => timeout
       )
       rq.on_complete do |response|
+        if logger
+          logger.debug "%s %s --> %d (%d %.0fs)" % [rq.method.to_s.upcase, rq.url,
+            response.code, response.body ? response.body.length : 0, response.time]
+        end
         response = augment_response(response)
-        yield response if block_given?
+        begin
+          yield response if block_given?
+        rescue => e
+          logger.error "error in callback: #{e}"
+        end
         response
       end
       hydra.queue(rq)
