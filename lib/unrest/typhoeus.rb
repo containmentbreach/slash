@@ -56,8 +56,7 @@ module UnREST
         nil
       else
         run
-        check_and_raise(rq.handled_response)
-        ret
+        block_given? ? ret : check_and_raise(rq.handled_response)
       end
     end
 
