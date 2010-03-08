@@ -21,18 +21,49 @@ module UnREST
 
     # Set URI for remote service.
     def site=(site)
-      @site = Addressable::URI.parse(site)
+      @site = Addressable::URI.parse(site).dup
+      @site.path = @site.query = @site.fragment = nil
+      @site
     end
 
     def run
       # no op
     end
 
+    # Execute a GET request.
+    # Used to get (find) resources.
+    def get(options = {}, &block)
+      request(:get, options, &block)
+    end
+
+    # Execute a DELETE request (see HTTP protocol documentation if unfamiliar).
+    # Used to delete resources.
+    def delete(options = {}, &block)
+      request(:delete, options, &block)
+    end
+
+    # Execute a PUT request.
+    # Used to update resources.
+    def put(options = {}, &block)
+      request(:put, options, &block)
+    end
+
+    # Execute a POST request.
+    # Used to create new resources.
+    def post(options = {}, &block)
+      request(:post, options, &block)
+    end
+
+    # Execute a HEAD request.
+    # Used to obtain meta-information about resources, such as whether they exist and their size (via response headers).
+    def head(options = {}, &block)
+      request(:head, options, &block)
+    end
+
     private
     # Builds headers for request to remote service.
     def build_request_headers(headers)
-      h = authorization_header
-      h.update(headers) if headers
+      authorization_header.update(headers || {})
     end
 
     # Sets authorization header

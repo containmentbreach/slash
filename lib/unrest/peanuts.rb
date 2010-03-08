@@ -13,7 +13,7 @@ module UnREST
       end
 
       def encode(data)
-        data.to_xml(to_xml_options)
+        data.to_xml(:string, to_xml_options)
       end
 
       def decode(data)

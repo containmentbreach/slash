@@ -4,27 +4,32 @@ module UnREST
     autoload :PeanutsXML, 'unrest/peanuts'
 
     def self.xml(options = {})
-      Format.new(options.fetch(:mime, 'application/xml'), options.fetch(:codec))
+      Format.new({:mime => 'application/xml'}.update(options))
     end
 
     def self.json(options = {})
-      Format.new(options.fetch(:mime, 'application/json'), options.fetch(:codec) { JSON })
+      options = {:mime => 'application/json'}.update(options)
+      options[:codec] ||= JSON
+      Format.new(options)
     end
 
     class Format
       attr_reader :mime, :codec
 
-      def initialize(mime, codec)
-        @mime, @codec = mime, codec
+      def initialize(options)
+        @codec = options[:codec]
+        @mime = options[:mime] || (@codec.respond_to?(:mime) ? @codec.mime : nil)
       end
 
-      def prepare_request(path, params, headers, data)
-        headers['Accept'] = mime
+      def prepare_request(method, options)
+        headers = options[:headers]
+        headers['Accept'] = mime if mime
+        data = options.delete(:data)
         if data
-          data = codec.encode(data)
-          headers['Content-Type'] = mime
+          options[:body] = codec.encode(data)
+          headers['Content-Type'] = mime if mime
         end
-        yield path, params, headers, data
+        yield options
       end
 
       def interpret_response(response)

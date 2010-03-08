@@ -22,8 +22,8 @@ module UnREST
         @result
       end
 
-      def error?
-        !exception.nil?
+      def success?
+        exception.nil?
       end
     end
 
@@ -34,14 +34,24 @@ module UnREST
     def_delegators :connection, :run, :site, :user, :password, :timeout, :proxy,
       :site=, :user=, :password=, :timeout=, :proxy=
 
+    def user_agent
+      headers['User-Agent']
+    end
+
+    def user_agent=(value)
+      headers['User-Agent'] = value
+    end
+
     def self.new!(*args, &block)
       r = allocate
       r.send(:initialize!, *args, &block)
       r
     end
 
-    def initialize(connection, path, params, headers)
-      @connection, @path, @params, @headers = connection, path, params, headers
+    def initialize(connection, options = {})
+      @connection = connection
+      @path, @params, @headers = options[:path] || '', options[:params] || {}, options[:headers] || {}
+      self.user_agent ||= UnREST::USER_AGENT
     end
 
     def initialize!(from, path, params, headers)
@@ -49,37 +59,65 @@ module UnREST
     end
     private :initialize!
 
-    def [](path, params = {}, headers = {})
-      self.class.new!(self, path, params, headers)
+    def slash(options)
+      self.class.new!(self, options[:path], options[:params] || {}, options[:headers] || {})
     end
 
-    def get(params = {}, headers = {}, &block)
-      _request(block, params, headers) do |path, params, headers, body, handler|
-        connection.get(path, params, headers, &handler)
-      end
+    def [](path)
+      slash(:path => path)
     end
 
-    def post(params = {}, data = nil, headers = {}, &block)
-      _request(block, params, headers, data) do |path, params, headers, body, handler|
-        connection.post(path, params, body, headers, &handler)
-      end
+    # Execute a GET request.
+    # Used to get (find) resources.
+    def get(options = {}, &block)
+      request(:get, options, &block)
     end
 
-    def put(params = {}, data = nil, headers = {}, &block)
-      _request(block, params, headers, data) do |path, params, headers, body, handler|
-        connection.put(path, params, body, headers, &handler)
-      end
+    # Execute a DELETE request (see HTTP protocol documentation if unfamiliar).
+    # Used to delete resources.
+    def delete(options = {}, &block)
+      request(:delete, options, &block)
     end
 
-    def delete(params = {}, headers = {}, &block)
-      _request(block, params, headers) do |path, params, headers, body, handler|
-        connection.delete(path, params, headers, &handler)
+    # Execute a PUT request.
+    # Used to update resources.
+    def put(options = {}, &block)
+      request(:put, options, &block)
+    end
+
+    # Execute a POST request.
+    # Used to create new resources.
+    def post(options = {}, &block)
+      request(:post, options, &block)
+    end
+
+    # Execute a HEAD request.
+    # Used to obtain meta-information about resources, such as whether they exist and their size (via response headers).
+    def head(options = {}, &block)
+      request(:head, options, &block)
+    end
+
+    def request(method, options)
+      merge(options[:params] || {}, options[:headers] || {}) do |path, params, headers|
+        prepare_request(method,
+          :path => path,
+          :params => params,
+          :headers => headers,
+          :data => options[:data],
+          :async => options[:async]
+        ) do |request|
+          connection.request(method, request) do |response|
+            resp = handle_response(response)
+            block_given? ? yield(resp) : resp
+          end
+        end
       end
     end
 
     private
-    def prepare_request(path, params, headers, data)
-      yield path, params, headers, data
+    def prepare_request(method, options)
+      options[:body] = options.delete(:data).to_s
+      yield options
     end
 
     def handle_response(response)
@@ -95,24 +133,8 @@ module UnREST
       response.body
     end
 
-    def request(handler, params, headers, data = nil)
-      merge(nil, params, headers) do |path, params, headers|
-        prepare_request(path, params, headers, data) do |path, params, headers, data|
-          h = handler && proc do |response|
-            begin
-              handler.call(handle_response(response))
-            rescue => e
-              logger.error "error in callback: #{e}"
-            end
-          end
-          resp = yield(path, params, headers, data, h)
-          handler ? nil : handle_response(resp)
-        end
-      end
-    end
-
-    def merge(path, params, headers, &block)
-      _merge(self, path, params, headers, &block)
+    def merge(params, headers, &block)
+      _merge(self, nil, params, headers, &block)
     end
 
     def _merge(from, path, params, headers)
@@ -123,7 +145,7 @@ module UnREST
       end
       params, headers = from.params.merge(params), from.headers.merge(headers)
       if block_given?
-        return yield(path, params, headers)
+        yield(path, params, headers)
       else
         return path, params, headers
       end
@@ -134,27 +156,33 @@ module UnREST
     attr_accessor :format
 
     def initialize(uri, options = {})
-      uri = Addressable::URI.parse(uri)
-      super(create_connection(uri), uri.path, options[:params] || {}, options[:headers] || {})
+      conn = if uri.is_a?(Connection)
+        uri
+      else
+        uri = Addressable::URI.parse(uri)
+        options = {:path => uri.path}.update(options)
+        create_connection(uri)
+      end
+      super(conn, options)
       self.format = options[:format]
     end
 
+    private
     def initialize!(from, path, params, headers)
       super
       self.format = from.format
     end
 
-    private
     def create_connection(site)
       UnREST.create_connection(site)
     end
 
-    def prepare_request(path, params, headers, data, &block)
-      format ? format.prepare_request(path, params, headers, data, &block) : super
+    def prepare_request(method, options, &block)
+      format ? format.prepare_request(method, options, &block) : super
     end
 
     def prepare_result(response)
-      format ? format.interpret_response(response) : super
+      response.success? && format ? format.interpret_response(response) : super
     end
   end
 end

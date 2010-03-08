@@ -11,6 +11,16 @@ module UnREST
   # This class is used by ActiveResource::Base to interface with REST
   # services.
   class NetHttpConnection < Connection
+    @@request_types = {
+      :get => Net::HTTP::Get,
+      :post => Net::HTTP::Post,
+      :put => Net::HTTP::Put,
+      :delete => Net::HTTP::Delete
+    }
+
+    def self.request_types
+      @@request_types
+    end
 
     attr_reader :proxy, :ssl_options
 
@@ -38,63 +48,33 @@ module UnREST
       configure_http(@http) if @http
     end
 
-    # Execute a GET request.
-    # Used to get (find) resources.
-    def get(path = nil, params = {}, headers = {}, &block)
-      request(block, Net::HTTP::Get, path, params, headers)
-    end
+    def request(method, options = {})
+      params = options[:params]
+      rqtype = @@request_types[method] || raise(ArgumentError, "Unsupported method #{method}")
 
-    # Execute a DELETE request (see HTTP protocol documentation if unfamiliar).
-    # Used to delete resources.
-    def delete(path, params = {}, headers = {}, &block)
-      request(block, Net::HTTP::Delete, path, params, headers)
-    end
-
-    # Execute a PUT request (see HTTP protocol documentation if unfamiliar).
-    # Used to update resources.
-    def put(path, params = {}, body = '', headers = {}, &block)
-      request(block, Net::HTTP::Put, path, body ? params : {}, headers) do |rq|
-        if body
-          rq.body = body
-        else
-          rq.form_data = params
-        end
+      path = options[:path]
+      headers = build_request_headers(options[:headers])
+      if !params.empty? &&  [:post, :put].include?(method)
+        form_data = params
+      else
+        path = "#{path}?#{params_to_query(params)}"
       end
-    end
 
-    # Execute a POST request.
-    # Used to create new resources.
-    def post(path, params = {}, body = nil, headers = {}, &block)
-      request(block, Net::HTTP::Post, path, body ? params : {}, headers) do |rq|
-        if body
-          rq.body = body
-        else
-          rq.form_data = params
-        end
-      end
-    end
+      rq = rqtype.new(path, headers)
+      rq.form_data = form_data if form_data
+      rq.body = options[:body] if options[:body]
 
-    # Execute a HEAD request.
-    # Used to obtain meta-information about resources, such as whether they exist and their size (via response headers).
-    def head(path, params = {}, headers = {}, &block)
-      request(block, Net::HTTP::Head, path, params, headers)
-    end
-
-    private
-    def request(handler, rqtype, path, params, headers)
-      query = params_to_query(params)
-      rq = rqtype.new(query.empty? ? path : "#{path}?#{query}", build_request_headers(headers))
-      yield rq if block_given?
       resp = http_request(rq)
-      if handler
-        handler.call(resp)
-        resp
+      if block_given?
+        yield resp
       else
         check_and_raise(resp)
       end
     end
 
+    private
     def params_to_query(params)
+      return '' if !params || params.empty?
       require 'cgi' unless defined?(CGI) && defined?(CGI::escape)
       params.map do |k, v|
         q = CGI.escape(k.to_s)
@@ -105,10 +85,9 @@ module UnREST
 
     # Makes request to remote service.
     def http_request(rq)
-      logger.debug "#{rq.method.to_s.upcase} #{site.merge(rq.path)}" if logger
+      logger.debug "#{rq.method.to_s.upcase} #{site.merge(:path => rq.path)}" if logger
       result = nil
       ms = 1000 * Benchmark.realtime { result = http.request(rq) }
-      result = http.request(rq)
       logger.debug "--> %d %s (%d %.0fms)" % [result.code, result.message, result.body ? result.body.length : 0, ms] if logger
       augment_response(result)
     rescue Timeout::Error => e
@@ -124,6 +103,9 @@ module UnREST
         def body_stream
           body && StringIO.new(body)
         end
+        def success?
+          exception.nil?
+        end
       end
       handle_response(response)
     end
@@ -136,9 +118,9 @@ module UnREST
 
     def new_http
       if @proxy
-        Net::HTTP.new(@site.host, @site.port, @proxy.host, @proxy.port, @proxy.user, @proxy.password)
+        Net::HTTP.new(@site.normalized_host, @site.inferred_port, @proxy.host, @proxy.port, @proxy.user, @proxy.password)
       else
-        Net::HTTP.new(@site.host, @site.port)
+        Net::HTTP.new(@site.normalized_host, @site.inferred_port)
       end
     end
 
@@ -155,7 +137,7 @@ module UnREST
     end
 
     def apply_ssl_options(http)
-      return http unless @site.is_a?(URI::HTTPS)
+      return http unless @site.normalized_scheme == 'https'
 
       http.use_ssl     = true
       http.verify_mode = OpenSSL::SSL::VERIFY_NONE
