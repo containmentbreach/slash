@@ -41,13 +41,14 @@ module UnREST
         :timeout => options[:timeout] || timeout,
         :user_agent => headers['User-Agent']
       )
+      ret = nil
       rq.on_complete do |response|
         if logger
           logger.debug "%s %s --> %d (%d %.0fs)" % [rq.method.to_s.upcase, rq.url,
             response.code, response.body ? response.body.length : 0, response.time]
         end
-        response = augment_response(response)
-        yield response if block_given?
+        ret = response = augment_response(response)
+        ret = yield response if block_given?
         response
       end
       hydra.queue(rq)
@@ -56,6 +57,7 @@ module UnREST
       else
         run
         check_and_raise(rq.handled_response)
+        ret
       end
     end
 
