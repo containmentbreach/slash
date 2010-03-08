@@ -3,11 +3,7 @@ require 'unrest/formats'
 
 module UnREST
   module Formats
-    class JSON < GenericFormat
-      def initialize(suffix = '.json', mime = 'application/json')
-        super
-      end
-
+    class JSON
       def encode(data)
         ::JSON.generate(data)
       end

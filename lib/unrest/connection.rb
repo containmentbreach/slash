@@ -1,10 +1,16 @@
-require 'uri'
+require 'forwardable'
+require 'addressable/uri'
 require 'unrest/exceptions'
 
 
 module UnREST
-  class BaseConnection
-    attr_accessor :site, :user, :password, :timeout, :proxy
+  class Connection
+    extend Forwardable
+
+    attr_reader :site
+    attr_accessor :timeout, :proxy
+
+    def_delegators :site, :host, :user, :password, :user=, :password=
 
     # The +site+ parameter is required and will set the +site+
     # attribute to the URI for the remote resource service.
@@ -15,11 +21,7 @@ module UnREST
 
     # Set URI for remote service.
     def site=(site)
-      @site = site.is_a?(URI) ? site : URI.parse(site)
-      (@site = @site.dup).path = '' unless @site.path.empty?
-
-      @user = URI.decode(@site.user) if @site.user
-      @password = URI.decode(@site.password) if @site.password
+      @site = Addressable::URI.parse(site)
     end
 
     def run
@@ -81,13 +83,22 @@ module UnREST
     end
   end
 
-  def self.default_connection
-    @@default_connection ||= NetHttpConnection
+  def self.create_connection(site = nil, &block)
+    if block_given?
+      @@create_connection = block
+    elsif @@create_connection.respond_to?(:new)
+      return @@create_connection.new(site)
+    else
+      return @@create_connection.call(site)
+    end
+  end
+  
+  def self.create_connection=(cls)
+    @@create_connection = cls
   end
 
-  def self.default_connection=(cls)
-    @@default_connection = cls
-  end
+  create_connection {|site| NetHttpConnection.new(site) }
+
 
   autoload :NetHttpConnection, 'unrest/nethttp'
   autoload :TyphoeusConnection, 'unrest/typhoeus'

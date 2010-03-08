@@ -3,14 +3,14 @@ require 'date'
 require 'time'
 require 'benchmark'
 require 'stringio'
-require 'unrest/base'
+require 'unrest/connection'
 
 
 module UnREST
   # Class to handle connections to remote web services.
   # This class is used by ActiveResource::Base to interface with REST
   # services.
-  class NetHttpConnection < BaseConnection
+  class NetHttpConnection < Connection
 
     attr_reader :proxy, :ssl_options
 

@@ -1,7 +1,7 @@
 gemspec = Gem::Specification.new do |s|
   s.name = 'unrest'
-  s.version = '0.2'
-  s.date = '2010-02-27'
+  s.version = '0.3'
+  s.date = '2010-03-08'
   s.authors = ['Igor Gunko']
   s.email = 'tekmon@gmail.com'
   s.summary = 'REST-client'
@@ -18,7 +18,7 @@ gemspec = Gem::Specification.new do |s|
     lib/unrest.rb
     lib/omg-unrest.rb
     lib/unrest/exceptions.rb
-    lib/unrest/base.rb
+    lib/unrest/connection.rb
     lib/unrest/nethttp.rb
     lib/unrest/typhoeus.rb
     lib/unrest/resource.rb
@@ -35,6 +35,7 @@ gemspec = Gem::Specification.new do |s|
   s.rdoc_options = %w(--line-numbers --main README.rdoc)
   s.extra_rdoc_files = %w(README.rdoc MIT-LICENSE)
 
+  s.add_dependency('addressable', ["~> 2.1.1"])
   #s.add_dependency('json', [">= 1.1.9"])
   #s.add_dependency('peanuts', [">= 2.0.8"])
 
@@ -43,7 +44,7 @@ gemspec = Gem::Specification.new do |s|
     s.specification_version = 2
 
     if Gem::Version.new(Gem::RubyGemsVersion) >= Gem::Version.new('1.2.0') then
-      s.add_development_dependency('rspec', ['>= 1.2.8'])
+      s.add_development_dependency('rspec', ['~> 1.2.8'])
     else
     end
   else

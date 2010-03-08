@@ -1,10 +1,10 @@
 require 'typhoeus'
 require 'stringio'
-require 'unrest/base'
+require 'unrest/connection'
 
 
 module UnREST
-  class TyphoeusConnection < BaseConnection
+  class TyphoeusConnection < Connection
     def initialize(site, hydra_or_options = nil)
       super(site)
       case hydra_or_options
@@ -58,7 +58,7 @@ module UnREST
     private
     def request(method, path, params, headers, body = nil)
       uri = site
-      uri = uri.merge(path) if path
+      uri = uri.merge(:path => path) if path
 
       rq = Typhoeus::Request.new(uri.to_s,
         :method => method,
