@@ -30,7 +30,7 @@ module UnREST
 
   # 3xx Redirection
   class Redirection < ConnectionError # :nodoc:
-    def to_s; response['Location'] ? "#{super} => #{response['Location']}" : super; end
+    def to_s; response.headers['Location'] ? "#{super} => #{response.headers['Location']}" : super; end
   end
 
   # 4xx Client Error
