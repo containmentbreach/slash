@@ -1,7 +1,7 @@
 require 'json'
-require 'unrest/formats'
+require 'slash/formats'
 
-module UnREST
+module Slash
   module Formats
     class JSON
       def encode(data)

@@ -1,6 +1,6 @@
-== unrest
-    @resource = UnREST::Resource.new('http://api.something.com',
-      UnREST::Formats.xml(:codec => UnREST::Formats::PeanutsXML.new(Response)),
+== slash
+    @resource = Slash::Resource.new('http://api.something.com',
+      Slash::Formats.xml(:codec => Slash::Formats::PeanutsXML.new(Response)),
       rewrite_options(options).update(:key => API_KEY))
 
     cats = @resource['cats']

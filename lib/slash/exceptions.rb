@@ -1,4 +1,4 @@
-module UnREST
+module Slash
   class ConnectionError < StandardError # :nodoc:
     attr_reader :response
 

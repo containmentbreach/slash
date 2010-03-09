@@ -1,7 +1,7 @@
 require 'peanuts'
-require 'unrest/formats'
+require 'slash/formats'
 
-module UnREST
+module Slash
   module Formats
     class PeanutsXML
       attr_reader :response_type

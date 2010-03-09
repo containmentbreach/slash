@@ -1,7 +1,7 @@
-module UnREST
+module Slash
   module Formats
-    autoload :JSON, 'unrest/json'
-    autoload :PeanutsXML, 'unrest/peanuts'
+    autoload :JSON, 'slash/json'
+    autoload :PeanutsXML, 'slash/peanuts'
 
     def self.xml(options = {})
       Format.new({:mime => 'application/xml'}.update(options))
@@ -21,7 +21,7 @@ module UnREST
         @mime = options[:mime] || (@codec.respond_to?(:mime) ? @codec.mime : nil)
       end
 
-      def prepare_request(method, options)
+      def prepare_request(options)
         headers = options[:headers]
         headers['Accept'] = mime if mime
         data = options.delete(:data)
@@ -29,7 +29,7 @@ module UnREST
           options[:body] = codec.encode(data)
           headers['Content-Type'] = mime if mime
         end
-        yield options
+        options
       end
 
       def interpret_response(response)
@@ -46,9 +46,9 @@ module UnREST
         @suffix = suffix
       end
 
-      def prepare_request(path, params, headers, data, &block)
-        path += suffix if suffix
-        super(path, params, headers, data)
+      def prepare_request(options, &block)
+        options[:path] += suffix if suffix
+        super
       end
 
       def self.xml(options = {})

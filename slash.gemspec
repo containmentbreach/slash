@@ -1,30 +1,30 @@
 gemspec = Gem::Specification.new do |s|
-  s.name = 'unrest'
-  s.version = '0.3.5'
-  s.date = '2010-03-09'
+  s.name = 'slash'
+  s.version = '0.4'
+  s.date = '2010-03-10'
   s.authors = ['Igor Gunko']
   s.email = 'tekmon@gmail.com'
   s.summary = 'REST-client'
   s.description = <<-EOS
     REST-client
   EOS
-  s.homepage = 'http://github.com/omg/unrest'
+  s.homepage = 'http://github.com/omg/slash'
   s.rubygems_version = '1.3.1'
 
   s.require_paths = %w(lib)
 
   s.files = %w(
     README.rdoc MIT-LICENSE Rakefile
-    lib/unrest.rb
-    lib/omg-unrest.rb
-    lib/unrest/exceptions.rb
-    lib/unrest/connection.rb
-    lib/unrest/nethttp.rb
-    lib/unrest/typhoeus.rb
-    lib/unrest/resource.rb
-    lib/unrest/formats.rb
-    lib/unrest/json.rb
-    lib/unrest/peanuts.rb
+    lib/slash.rb
+    lib/omg-slash.rb
+    lib/slash/exceptions.rb
+    lib/slash/connection.rb
+    lib/slash/nethttp.rb
+    lib/slash/typhoeus.rb
+    lib/slash/resource.rb
+    lib/slash/formats.rb
+    lib/slash/json.rb
+    lib/slash/peanuts.rb
   )
 
   s.test_files = %w(
@@ -35,6 +35,7 @@ gemspec = Gem::Specification.new do |s|
   s.rdoc_options = %w(--line-numbers --main README.rdoc)
   s.extra_rdoc_files = %w(README.rdoc MIT-LICENSE)
 
+  s.add_dependency('extlib', ["~> 0.9.14"])
   s.add_dependency('addressable', ["~> 2.1.1"])
   #s.add_dependency('json', [">= 1.1.9"])
   #s.add_dependency('peanuts', [">= 2.0.8"])

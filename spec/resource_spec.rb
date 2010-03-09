@@ -3,7 +3,7 @@
 
 require 'resource'
 
-describe UnREST::Resource do
+describe Slash::Resource do
   before(:each) do
     
   end

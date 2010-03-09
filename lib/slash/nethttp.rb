@@ -3,10 +3,10 @@ require 'date'
 require 'time'
 require 'benchmark'
 require 'stringio'
-require 'unrest/connection'
+require 'slash/connection'
 
 
-module UnREST
+module Slash
   # Class to handle connections to remote web services.
   # This class is used by ActiveResource::Base to interface with REST
   # services.
@@ -23,12 +23,6 @@ module UnREST
     end
 
     attr_reader :proxy, :ssl_options
-
-    # Set URI for remote service.
-    def site=(site)
-      @http = nil
-      super
-    end
 
     # Set the proxy for remote service.
     def proxy=(proxy)
@@ -48,23 +42,27 @@ module UnREST
       configure_http(@http) if @http
     end
 
-    def request(method, options = {})
-      params = options[:params]
+    def request(method, uri, options = {})
+      raise ArgumentError, 'this connection does not support async mode' if options[:async]
+
+      options = options.dup
+      prepare_request(uri, options)
+
       rqtype = @@request_types[method] || raise(ArgumentError, "Unsupported method #{method}")
-
-      path = options[:path]
-      headers = build_request_headers(options[:headers])
-      if !params.empty? &&  [:post, :put].include?(method)
-        form_data = params
-      else
-        path = "#{path}?#{params_to_query(params)}"
+      params = options[:params]
+      if !params.blank?
+        if [:post, :put].include?(method)
+          form_data = params
+        else
+          uri = uri.dup
+          uri.query_values = (uri.query_values(:flat) || {}).to_mash.update(params)
+        end
       end
-
-      rq = rqtype.new(path, headers)
+      rq = rqtype.new(uri.query.blank? ? uri.path : "#{uri.path}?#{uri.query}", options[:headers])
       rq.form_data = form_data if form_data
       rq.body = options[:body] if options[:body]
 
-      resp = http_request(rq)
+      resp = http_request(uri, rq)
       if block_given?
         yield resp
       else
@@ -73,21 +71,11 @@ module UnREST
     end
 
     private
-    def params_to_query(params)
-      return '' if !params || params.empty?
-      require 'cgi' unless defined?(CGI) && defined?(CGI::escape)
-      params.map do |k, v|
-        q = CGI.escape(k.to_s)
-        q << '=' << CGI.escape(v.to_s) if v
-        q
-      end * '&'
-    end
-
     # Makes request to remote service.
-    def http_request(rq)
-      logger.debug "#{rq.method.to_s.upcase} #{site.merge(:path => rq.path)}" if logger
+    def http_request(uri, rq)
+      logger.debug "#{rq.method.to_s.upcase} #{uri}" if logger
       result = nil
-      ms = 1000 * Benchmark.realtime { result = http.request(rq) }
+      ms = 1000 * Benchmark.realtime { result = http(uri).request(rq) }
       logger.debug "--> %d %s (%d %.0fms)" % [result.code, result.message, result.body ? result.body.length : 0, ms] if logger
       augment_response(result)
     rescue Timeout::Error => e
@@ -112,15 +100,19 @@ module UnREST
 
     # Creates new Net::HTTP instance for communication with
     # remote service and resources.
-    def http
-      @http ||= configure_http(new_http)
+    def http(uri)
+      if !@http || @host != uri.normalized_host || @port != uri.inferred_port || @scheme != uri.normalized_scheme
+        @host, @port, @scheme = uri.normalized_host, uri.inferred_port, uri.normalized_scheme
+        @http = configure_http(new_http)
+      end
+      @http
     end
 
     def new_http
       if @proxy
-        Net::HTTP.new(@site.normalized_host, @site.inferred_port, @proxy.host, @proxy.port, @proxy.user, @proxy.password)
+        Net::HTTP.new(@host, @port, @proxy.host, @proxy.port, @proxy.user, @proxy.password)
       else
-        Net::HTTP.new(@site.normalized_host, @site.inferred_port)
+        Net::HTTP.new(@host, @port)
       end
     end
 
@@ -129,15 +121,14 @@ module UnREST
 
       # Net::HTTP timeouts default to 60 seconds.
       if @timeout
-        http.open_timeout = @timeout
-        http.read_timeout = @timeout
+        http.open_timeout = http.read_timeout = @timeout
       end
 
       http
     end
 
     def apply_ssl_options(http)
-      return http unless @site.normalized_scheme == 'https'
+      return http unless @scheme == 'https'
 
       http.use_ssl     = true
       http.verify_mode = OpenSSL::SSL::VERIFY_NONE
