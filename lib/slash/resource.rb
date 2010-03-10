@@ -13,13 +13,13 @@ module Slash
         @result, @response, @exception = result, response, exception
       end
 
-      attr_reader :response, :exception
+      attr_reader :result, :response, :exception
 
       def_delegators :response, :code, :headers
 
-      def result
+      def result!
         raise exception if exception
-        @result
+        result
       end
 
       def success?
@@ -150,7 +150,11 @@ module Slash
         u.path = upath + '/' unless upath =~ /\/\z/
         u.join!(path)
       end
-      u.query_values = uq || {}
+      if uq
+        u.query_values = uq
+      else
+        u.query = nil
+      end
 
       p = options[:params] = from.params.dup
       p.merge!(params) unless params.blank?

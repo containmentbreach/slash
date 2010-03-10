@@ -55,7 +55,7 @@ module Slash
           form_data = params
         else
           uri = uri.dup
-          uri.query_values = (uri.query_values(:flat) || {}).to_mash.update(params)
+          uri.query_values = (uri.query_values(:notation => :flat) || {}).to_mash.update(params)
         end
       end
       rq = rqtype.new(uri.query.blank? ? uri.path : "#{uri.path}?#{uri.query}", options[:headers])
