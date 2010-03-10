@@ -42,7 +42,7 @@ module Slash
       rq = Typhoeus::Request.new(uri.to_s,
         :method => method,
         :headers => headers,
-        :params => params && !params.empty? && params.inject({}) {|h, x| h[x[0].to_s] = x[1] || ''; h },
+        :params => !params.blank? ? params.inject({}) {|h, x| h[x[0].to_s] = x[1] || ''; h } : nil,
         :body => options[:body],
         :timeout => options[:timeout] || timeout,
         :user_agent => headers['User-Agent']

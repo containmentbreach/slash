@@ -1,6 +1,6 @@
 gemspec = Gem::Specification.new do |s|
   s.name = 'slash'
-  s.version = '0.4'
+  s.version = '0.4.2'
   s.date = '2010-03-10'
   s.authors = ['Igor Gunko']
   s.email = 'tekmon@gmail.com'
@@ -16,7 +16,6 @@ gemspec = Gem::Specification.new do |s|
   s.files = %w(
     README.rdoc MIT-LICENSE Rakefile
     lib/slash.rb
-    lib/omg-slash.rb
     lib/slash/exceptions.rb
     lib/slash/connection.rb
     lib/slash/nethttp.rb

@@ -52,7 +52,7 @@ module Slash
       @connection = connection
       @uri = Addressable::URI.parse(uri)
       query = options[:query]
-      if query && !query.empty?
+      unless query.blank?
         @uri = @uri.dup
         uq = @uri.query_values
         @uri.query_values = uq ? uq.merge(query) : query
@@ -150,13 +150,13 @@ module Slash
         u.path = upath + '/' unless upath =~ /\/\z/
         u.join!(path)
       end
-      u.query_values = uq
+      u.query_values = uq || {}
 
       p = options[:params] = from.params.dup
-      p.merge!(params) if params && !params.empty?
+      p.merge!(params) unless params.blank?
 
       h = options[:headers] = from.headers.dup
-      h.merge!(headers) if headers && !headers.empty?
+      h.merge!(headers) unless headers.blank?
 
       options
     end
